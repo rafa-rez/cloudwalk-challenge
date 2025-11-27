@@ -1,0 +1,35 @@
+services:
+  # Serviço da API (Cérebro)
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./chroma_db:/app/chroma_db
+    networks:
+      - swarm_network
+
+  # Serviço do Frontend (Visualização)
+  frontend:
+    build: . # Usa o mesmo Dockerfile
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      # Aponta para o nome do serviço 'backend' dentro da rede interna
+      - API_URL=http://backend:8000/api/chat
+    volumes:
+      - ./chroma_db:/app/chroma_db # Opcional, se quiser que ele veja o banco
+    # Comando para sobrescrever o CMD do Dockerfile e rodar o Streamlit
+    command: streamlit run app/frontend.py --server.address 0.0.0.0
+    depends_on:
+      - backend
+    networks:
+      - swarm_network
+
+networks:
+  swarm_network:
+    driver: bridge
