@@ -1,0 +1,24 @@
+# Não subir variáveis de ambiente
+.env
+.env.local
+.env.*.local
+
+# Não subir o banco de vetores do ChromaDB
+chroma_db/
+chroma_db/*
+
+# Cache do Python
+__pycache__/
+*.pyc
+
+# Ambientes virtuais
+.venv/
+venv/
+
+# Logs
+*.log
+
+# Arquivos temporários
+*.tmp
+*.swp
+.DS_Store

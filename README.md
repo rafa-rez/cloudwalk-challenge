@@ -1,129 +1,137 @@
-# InfinitePay Swarm Intelligence
+# ⚡ CloudWalk Agent Swarm
 
-**Orquestração Multi‑Agente com Memória Persistente, RAG e Roteamento Inteligente**
-
-Este repositório contém uma Prova de Conceito (PoC) de uma arquitetura de atendimento ao cliente baseada em IA Generativa. A solução centraliza o roteamento em um *Router* que distribui as solicitações para agentes especialistas, garantindo tratamento diferenciado para dúvidas de produto, problemas técnicos e tentativas de ataque.
-
----
-
-## Visão Geral
-
-O sistema opera como um grafo de estado (*StateGraph*) utilizando LangGraph. A lógica de decisão segue o fluxo abaixo:
-
-1. **Input & Segurança** — A mensagem do usuário passa por um guardrail (checagem hardcoded de palavras-chave) para bloquear injeção de prompt e outros ataques antes de invocar o LLM.
-2. **Router (Cérebro)** — Analisa a intenção da última mensagem (com lógica anti‑bias) e decide qual agente especialista acionar.
-3. **Agentes Especialistas** — Cada agente responde a um domínio específico do problema.
-4. **Personality Layer** — Camada final que normaliza o tom de voz (sério para segurança; leve para atendimento).
+**Uma arquitetura multi-agente robusta e modular para atendimento financeiro inteligente.**
+Este projeto implementa um "Enxame de Agentes" (Agent Swarm) capaz de orquestrar atendimentos complexos, separar responsabilidades e garantir segurança através de Guardrails rígidos.
 
 ---
 
-## Agentes (Resumo)
+## 🧠 Arquitetura do Sistema
 
-- **Knowledge Agent** — Especialista em produtos e taxas. Utiliza RAG com ChromaDB e busca na web (ex.: DuckDuckGo). Sempre cita fontes quando necessário.
-- **Support Agent** — Especialista em conta e transações. Acessa o banco de dados mockado para verificar saldo, status de Pix e bloqueios; serve como interface de dados.
-- **Guardrail Agent** — Intercepta toxicidade e ataques; remove entradas maliciosas da memória para não contaminar o contexto.
-- **Human Handoff** — Detecta quando o caso precisa ser transferido para um atendente humano.
-- **Fallback Agent** — Trata mensagens ininteligíveis ou fora do escopo com respostas educadas que reorientam o usuário.
+O sistema utiliza **LangGraph** para gerenciar o fluxo de estado. A decisão de roteamento é **Stateless** (focada na intenção imediata), enquanto a experiência do usuário é **Stateful** (memória de conversa).
 
----
+```mermaid
+graph TD
+    User(Input do Usuário) --> Router{🧠 Router Agent}
 
-## Funcionalidades Principais
+    subgraph "Agentes Especialistas"
+        Router -->|Dúvidas/Info| Knowledge[📚 Knowledge Agent]
+        Router -->|Conta/Saldo| Support[🛠️ Support Agent]
+        Router -->|Solicitação Humana| Handoff[👨‍💼 Human Handoff]
+    end
 
-- **Backend**: FastAPI + LangGraph.
-- **Memória Persistente**: Armazena contexto por `thread_id`, com lógica para "esquecer" entradas maliciosas.
-- **Roteamento Contextual**: Permite mudança rápida de assunto sem ficar preso ao contexto anterior.
-- **RAG & Tools**: Integração com ChromaDB e ferramentas Python para consulta a dados simulados e busca.
-- **Segurança**: Dupla proteção — checagem de palavras‑chave pré‑LLM e prompts de guardrail.
-- **Frontend**: Streamlit com visualização tipo "circuit board" mostrando qual agente está ativo em tempo real.
-- **Bateria de Testes (QA)**: Cenários automatizados — Happy Path, erros, ataques — rodáveis via interface.
+    subgraph "Segurança & Fallback"
+        Router -->|Ataque/Keyword| Guard[🛡️ Guardrail]
+        Router -->|Nonsense| Fallback[🤷 Fallback]
+    end
 
----
+    %% Fluxo de Personalidade
+    Knowledge --> Personality[✨ Personality Agent]
+    Support --> Personality
+    Handoff --> Personality
 
-## Stack Tecnológica
+    %% Fluxo de Bloqueio (Pula Personalidade)
+    Guard --> Output(Resposta Final JSON)
+    Fallback --> Output
 
-- Linguagem: **Python 3.10**
-- Orquestração / Graph: **LangChain** & **LangGraph**
-- LLM: **Llama-3-8b** (via Groq Cloud)
-- API: **FastAPI**
-- Interface: **Streamlit**
-- Banco Vetorial: **ChromaDB**
-- Containerização: **Docker** & **Docker Compose**
+    Personality --> Output
 
----
-
-## Estrutura do Repositório
-
-```
-agent-swarm/
-├── app/
-│   ├── agents.py        # Definição do Grafo, Router e prompts dos agentes
-│   ├── database.py      # Banco de dados mockado (clientes, saldos, status)
-│   ├── tools.py         # Ferramentas (busca web, RAG, get_profile)
-│   ├── vector_store.py  # Lógica de conexão com ChromaDB
-│   ├── main.py          # API Gateway (FastAPI)
-│   └── frontend.py      # Interface visual (Streamlit)
-├── chroma_db/           # Persistência do banco vetorial
-├── ingest_data.py       # Script para popular o RAG (scraping)
-├── Dockerfile           # Imagem otimizada (PyTorch CPU)
-├── docker-compose.yml   # Orquestração dos serviços (backend + frontend)
-└── requirements.txt     # Dependências
+    style Router fill:#f9f,stroke:#333,stroke-width:2px
+    style Personality fill:#bbf,stroke:#333,stroke-width:2px
+    style Guard fill:#ff4b4b,stroke:#333,color:#fff
 ```
 
+## ✨ Funcionalidades Principais
+
+### 1. Roteamento Inteligente & Stateless
+O Router Agent analisa cada mensagem isoladamente. Ele não se deixa enviesar pelo passado para decidir o destino, garantindo que uma mudança brusca de assunto (ex: de "Erro no Pix" para "Quanto custa o Bitcoin?") seja tratada corretamente.
+
+### 2. Agentes Especializados
+- 📚 **Knowledge Agent:** Utiliza RAG (Retrieval-Augmented Generation) com ChromaDB para responder sobre produtos InfinitePay e DuckDuckGo para buscas na web em tempo real.
+- 🛠️ **Support Agent:** Conecta-se a um banco de dados (Mock) para realizar consultas sensíveis (Saldo, Status da Conta, Bloqueios).
+- 🛡️ **Guardrail:** Camada de segurança determinística. Bloqueia tentativas de jailbreak, prompt injection ou linguagem tóxica.
+
+### 3. Personalidade & Editoração
+Um agente final (Personality) atua como editor de texto, garantindo tom de voz da marca e formatação correta.  
+Respostas vindas de Guardrail e Fallback **pulam** essa etapa.
+
+### 4. Frontend Modular (Streamlit)
+Interface dividida em abas estratégicas:
+
+- 🧩 Chat Stateless (com grafo em tempo real)
+- 💬 Chat Stateful (experiência tipo WhatsApp)
+- 🧪 Bateria de Testes (QA automatizado)
+
 ---
 
-## Pré‑requisitos
+## 📂 Estrutura do Projeto
 
-- Docker e Docker Compose instalados.
-- Chave de API da Groq (pode ser de teste).
-
----
-
-## Como Executar
-
-1. Clone o repositório:
-
-```bash
-git clone https://github.com/rafa-rez/cloudwalk-challenge.git
-cd agent-swarm
+```
+app/
+├── agents/
+│   ├── knowledge/
+│   ├── router/
+│   ├── support/
+│   └── utils/
+├── core/
+│   ├── config.py
+│   ├── database.py
+│   ├── state.py
+│   ├── vector_store.py
+│   └── workflow.py
+├── frontend/
+│   ├── components/
+│   ├── main.py
+│   └── styles.py
+└── main.py
 ```
 
-2. Crie um arquivo `.env` na raiz com as variáveis necessárias:
+---
 
-```env
+## 🚀 Como Executar
+
+### Pré‑requisitos
+- Docker & Docker Compose  
+- Uma chave de API da Groq Cloud (`GROQ_API_KEY`)
+
+### 1. Criar `.env`
+```
+CHAVE_GROQ=gsk_sua_chave_aqui...
 GROQ_MODEL=llama-3.1-8b-instant
-CHAVE_GROQ=sua_chave_aqui
 API_URL=http://backend:8000/api/chat
 ```
 
-3. Suba os containers:
-
-```bash
+### 2. Executar com Docker
+```
 docker-compose up --build
 ```
 
-4. Acesse a aplicação:
+Acesse:  
+Frontend → http://localhost:8501  
+API Docs → http://localhost:8000/docs
 
-- Frontend (chat & testes): `http://localhost:8501`
-- API Docs (Swagger): `http://localhost:8000/docs`
-
----
-
-## Como Testar (QA)
-
-No frontend há uma aba **Bateria de Testes** com cenários pré‑configurados que usam entradas do `app/database.py`:
-
-- **Client Happy**: usuário com saldo positivo.
-- **Client Blocked**: usuário com bloqueio por fraude (teste de segurança).
-- **Client Debt**: usuário com saldo negativo.
-- **Attacker**: simulação de jailbreak / prompt injection.
-
-Clique em **Executar Bateria de Testes** para observar o roteamento, assertividade e métricas de latência em tempo real.
+### 3. Executar Testes
+Na aba **🧪 Bateria de Testes** no Streamlit.
 
 ---
 
-## Notas de Desenvolvimento
+## 🛠️ Detalhes Técnicos
 
-- **Ingestão de Dados**: Para atualizar o conhecimento do bot, edite as URLs em `ingest_data.py` e execute o script localmente ou dentro do container para repopular `chroma_db`.
-- **Mock DB**: Adicione novos casos de teste editando `app/database.py`.
-- **Roteiros de Segurança**: O fluxo de guardrails é composto por uma checagem inicial de palavras‑chave e prompts adicionais executados pelo Guardrail Agent; ajustes podem ser feitos em `app/agents.py` e `app/tools.py`.
+### 🔍 Pipeline RAG
+- Scraping via `ingest_data.py`
+- Embeddings com `all-MiniLM-L6-v2`
+- ChromaDB busca top‑4 chunks
+- Citação obrigatória de `metadata['source']`
+
+### 🛡️ Guardrails
+- *Keyword Blocking*
+- *Sanitização de Saída*
+- *Isolamento de Memória*
+
+---
+
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.109-009688?style=for-the-badge&logo=fastapi)
+![LangGraph](https://img.shields.io/badge/LangGraph-Orchestration-FF6F00?style=for-the-badge)
+![Streamlit](https://img.shields.io/badge/Streamlit-Frontend-FF4B4B?style=for-the-badge&logo=streamlit)
+![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?style=for-the-badge&logo=docker)
 
