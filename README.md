@@ -10,34 +10,51 @@ Este projeto implementa um "Enxame de Agentes" (Agent Swarm) capaz de orquestrar
 O sistema utiliza **LangGraph** para gerenciar o fluxo de estado. A decisão de roteamento é **Stateless** (focada na intenção imediata), enquanto a experiência do usuário é **Stateful** (memória de conversa).
 
 ```mermaid
-graph TD
-    User(Input do Usuário) --> Router{🧠 Router Agent}
+flowchart LR
+    %% Estilo global
+    classDef agent fill:#eef,stroke:#447,stroke-width:1.5px,color:#000,rx:10,ry:10
+    classDef danger fill:#ffdddd,stroke:#a00,stroke-width:1.5px,color:#000,rx:10,ry:10
+    classDef output fill:#ddf7dd,stroke:#080,stroke-width:1.5px,color:#000,rx:10,ry:10
+    classDef router fill:#f7e1ff,stroke:#8040a0,stroke-width:1.5px,color:#000,rx:10,ry:10
 
-    subgraph "Agentes Especialistas"
-        Router -->|Dúvidas/Info| Knowledge[📚 Knowledge Agent]
-        Router -->|Conta/Saldo| Support[🛠️ Support Agent]
-        Router -->|Solicitação Humana| Handoff[👨‍💼 Human Handoff]
+    User[[👤 Usuário]]
+    Router{{🧠 Router Agent}}
+    class Router router
+
+    subgraph AG[🎯 Agentes Especialistas]
+        Knowledge[📚 Knowledge Agent]
+        Support[🛠️ Support Agent]
+        Handoff[👨‍💼 Human Handoff]
+        class Knowledge,Support,Handoff agent
     end
 
-    subgraph "Segurança & Fallback"
-        Router -->|Ataque/Keyword| Guard[🛡️ Guardrail]
-        Router -->|Nonsense| Fallback[🤷 Fallback]
+    subgraph SEC[🛡️ Segurança & Fallback]
+        Guard[🚫 Guardrail]
+        Fallback[🤷 Fallback]
+        class Guard, Fallback danger
     end
 
-    %% Fluxo de Personalidade
-    Knowledge --> Personality[✨ Personality Agent]
+    Personality[✨ Personality Agent]
+    class Personality agent
+
+    Output(((📤 Resposta Final)))
+    class Output output
+
+    User --> Router
+    Router -->|Dúvidas/Info| Knowledge
+    Router -->|Conta/Saldo| Support
+    Router -->|Humano| Handoff
+
+    Router -->|Ataque/Keyword| Guard
+    Router -->|Nonsense| Fallback
+
+    Knowledge --> Personality
     Support --> Personality
     Handoff --> Personality
 
-    %% Fluxo de Bloqueio (Pula Personalidade)
-    Guard --> Output(Resposta Final JSON)
+    Guard --> Output
     Fallback --> Output
-
     Personality --> Output
-
-    style Router fill:#f9f,stroke:#333,stroke-width:2px
-    style Personality fill:#bbf,stroke:#333,stroke-width:2px
-    style Guard fill:#ff4b4b,stroke:#333,color:#fff
 ```
 
 ## ✨ Funcionalidades Principais
