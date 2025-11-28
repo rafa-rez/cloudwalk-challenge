@@ -1,7 +1,7 @@
 import logging
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from app.agents import app_swarm # Garante que importa do arquivo agents.py
+from app.core.workflow import app_swarm
 from langchain_core.messages import HumanMessage
 
 # Configuracao de Logging da API

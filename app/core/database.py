@@ -1,4 +1,4 @@
-# app/database.py
+# app/core/database.py
 
 MOCK_DB = {
     # --- CENÁRIOS FELIZES (HAPPY PATH) ---
@@ -62,6 +62,7 @@ MOCK_DB = {
         "status": "active",
         "segment": "external"
     },
-    # Mantendo compatibilidade com testes antigos se necessário
+    
+    # Compatibilidade legado
     "client789": {"name": "Legacy User", "balance": 1000.00, "status": "active"}
 }

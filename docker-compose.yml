@@ -21,10 +21,11 @@ services:
     environment:
       # Aponta para o nome do serviço 'backend' dentro da rede interna
       - API_URL=http://backend:8000/api/chat
+      - PYTHONPATH=/app
     volumes:
       - ./chroma_db:/app/chroma_db # Opcional, se quiser que ele veja o banco
     # Comando para sobrescrever o CMD do Dockerfile e rodar o Streamlit
-    command: streamlit run app/frontend.py --server.address 0.0.0.0
+    command: streamlit run app/frontend/main.py --server.address 0.0.0.0
     depends_on:
       - backend
     networks:
