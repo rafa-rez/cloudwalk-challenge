@@ -5,7 +5,7 @@ from typing import TypedDict, Literal, Optional, Annotated
 from dotenv import load_dotenv
 
 from langchain_groq import ChatGroq
-from langchain_core.messages import HumanMessage, SystemMessage, RemoveMessage
+from langchain_core.messages import HumanMessage, SystemMessage, RemoveMessage, AIMessage
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
@@ -41,16 +41,15 @@ class AgentState(TypedDict):
     retry_count: int
 
 # ------------------------------------------------------------------
-# NO 1: ROUTER AGENT (ANTI-BIAS)
+# NO 1: ROUTER AGENT (STATELESS STRICT)
 # ------------------------------------------------------------------
 def router_node(state: AgentState):
     messages = state["messages"]
-    recent_history = messages[-3:] 
     
-    # Pega apenas o conteudo da ultima mensagem para analise de keyword
+    # MUDANÇA: O Router agora ignora totalmente o histórico passado (Stateless)
+    # Pega apenas a ultima mensagem para decisao
     last_user_message = messages[-1]
     last_text = last_user_message.content.lower()
-    last_message_id = last_user_message.id
     current_retries = state.get("retry_count", 0)
     
     # 1. CAMADA DE SEGURANÇA (HARDCODED)
@@ -68,41 +67,34 @@ def router_node(state: AgentState):
     if current_retries >= 2:
         return {"next_agent": "human_handoff", "retry_count": 0}
 
-    # 2. PROMPT ANTI-BIAS (Focado na ULTIMA mensagem)
+    # 2. PROMPT SEM HISTÓRICO
     system_prompt = (
         "Você é o cérebro de classificação da InfinitePay. "
-        "Sua função é analisar a conversa e definir o PRÓXIMO passo.\n\n"
-
-        "🚨 REGRA DE OURO (MUDANÇA DE CONTEXTO):\n"
-        "Analise EXCLUSIVAMENTE a intenção da ÚLTIMA mensagem do usuário.\n"
-        "IGNORE o contexto anterior se o usuário mudar de assunto.\n"
-        "Exemplo: Se estavam falando de 'Erro no Pix' (Support) e o usuário pergunta 'Quais as taxas?' (Knowledge), MUDE para knowledge_agent IMEDIATAMENTE.\n\n"
-
+        "Sua função é analisar a MENSAGEM ATUAL e definir o PRÓXIMO passo.\n\n"
         "OPÇÕES DE ROTA:\n"
-        "- knowledge_agent: Dúvidas teóricas ('Como funciona', 'Taxas', 'O que é'), Curiosidades.\n"
-        "- support_agent: Problemas TÉCNICOS ('Erro', 'Falha', 'Não funciona'), Dados da Conta ('Saldo', 'Extrato').\n"
-        "- human_handoff: Pediu humano.\n"
+        "- knowledge_agent: Dúvidas teóricas, 'Como funciona', 'Taxas', Informações.\n"
+        "- support_agent: Ação na conta, 'Erro', 'Falha', 'Saldo', 'Extrato'.\n"
+        "- human_handoff: Pediu humano explicitamente.\n"
         "- guardrail: Ataques/Ilegalidades.\n"
         "- fallback: Nonsense/Out of scope.\n\n"
-
         "Responda APENAS o nome da rota."
     )
     
-    # Dica: Passamos o historico para ele entender o contexto, mas o prompt manda focar na ultima
-    response = llm.invoke([SystemMessage(content=system_prompt)] + recent_history)
+    # Passamos apenas o System Prompt e a ÚLTIMA mensagem do usuário
+    response = llm.invoke([SystemMessage(content=system_prompt), last_user_message])
     decision = response.content.strip().lower().replace("'", "").replace('"', "").replace(".", "")
     
     valid_destinations = ["knowledge_agent", "support_agent", "human_handoff", "guardrail", "fallback"]
 
     if decision in valid_destinations:
-        logger.info(f"Router Decisao: {decision} (Baseado em: '{last_text[:20]}...')")
+        logger.info(f"Router Decisao: {decision}")
         return {"next_agent": decision, "retry_count": 0}
 
     logger.warning(f"Router alucinou: {decision}. Fallback.")
     return {"next_agent": "fallback", "retry_count": 0}
 
 # ------------------------------------------------------------------
-# NO 2: KNOWLEDGE AGENT
+# NO 2: KNOWLEDGE AGENT (COM MEMÓRIA)
 # ------------------------------------------------------------------
 def knowledge_node(state: AgentState):
     messages = state["messages"]
@@ -117,6 +109,8 @@ def knowledge_node(state: AgentState):
     ))
     
     response = llm_with_tools.invoke([system_message] + messages)
+    
+    final_content = response.content
     
     if response.tool_calls:
         tool_outputs = []
@@ -134,12 +128,16 @@ def knowledge_node(state: AgentState):
                     tool_outputs.append(SystemMessage(content=f"Erro: {str(e)}"))
             
         final_answer = llm.invoke([system_message] + messages + tool_outputs)
-        return {"final_response": final_answer.content}
+        final_content = final_answer.content
     
-    return {"final_response": response.content}
+    # RETORNO: Salva a resposta no histórico (AIMessage)
+    return {
+        "final_response": final_content,
+        "messages": [AIMessage(content=final_content)]
+    }
 
 # ------------------------------------------------------------------
-# NO 3: SUPPORT AGENT
+# NO 3: SUPPORT AGENT (COM MEMÓRIA)
 # ------------------------------------------------------------------
 def support_node(state: AgentState):
     user_id = state["user_id"]
@@ -150,47 +148,50 @@ def support_node(state: AgentState):
     
     system_message = SystemMessage(content=(
         f"Você é um Assistente Técnico. Cliente: {user_id}.\n"
-        "Objetivo: Resolver problemas de conta.\n\n"
+        "Objetivo: Resolver problemas de conta.\n"
         "DIRETRIZES:\n"
         "1. Perguntou saldo/dados? -> USE 'get_user_profile'.\n"
         "2. Relatou erro/falha? -> USE 'check_transfer_status'.\n"
         "3. NÃO invente dados. Use as ferramentas.\n"
-        "4. NÃO use tags XML/JSON no texto final. Apenas chame a ferramenta."
     ))
+    
+    final_content = "Sistema instável."
     
     try:
         response = llm_with_tools.invoke([system_message] + messages)
+        final_content = response.content
+
+        if response.tool_calls:
+            tool_outputs = []
+            for call in response.tool_calls:
+                args = call["args"]
+                if "user_id" not in args: args["user_id"] = user_id
+                
+                tool_func = {
+                    "get_user_profile": get_user_profile,
+                    "check_transfer_status": check_transfer_status
+                }[call["name"]]
+                
+                try:
+                    res = tool_func.invoke(args)
+                    tool_outputs.append(SystemMessage(content=f"Sistema: {res}"))
+                except Exception as e:
+                    tool_outputs.append(SystemMessage(content=f"Erro Tool: {e}"))
+            
+            final_answer = llm.invoke([system_message] + messages + tool_outputs)
+            final_content = final_answer.content
+
     except Exception as e:
         logger.error(f"Erro LLM Support: {e}")
-        return {"final_response": "Sistema instável. Tente novamente."}
     
-    if response.tool_calls:
-        tool_outputs = []
-        for call in response.tool_calls:
-            args = call["args"]
-            if "user_id" not in args: args["user_id"] = user_id
-            
-            tool_func = {
-                "get_user_profile": get_user_profile,
-                "check_transfer_status": check_transfer_status
-            }[call["name"]]
-            
-            try:
-                res = tool_func.invoke(args)
-                tool_outputs.append(SystemMessage(content=f"Sistema: {res}"))
-            except Exception as e:
-                tool_outputs.append(SystemMessage(content=f"Erro Tool: {e}"))
-            
-        try:
-            final_answer = llm.invoke([system_message] + messages + tool_outputs)
-            return {"final_response": final_answer.content}
-        except Exception as e:
-            return {"final_response": "Erro ao processar dados."}
-
-    return {"final_response": response.content}
+    # RETORNO: Salva a resposta no histórico (AIMessage)
+    return {
+        "final_response": final_content,
+        "messages": [AIMessage(content=final_content)]
+    }
 
 # ------------------------------------------------------------------
-# NO 4: FALLBACK AGENT
+# NO 4: FALLBACK AGENT (SEM POLUIR MEMÓRIA)
 # ------------------------------------------------------------------
 def fallback_node(state: AgentState):
     messages = state["messages"]
@@ -198,30 +199,36 @@ def fallback_node(state: AgentState):
     options = [
         "Desculpe, sou especialista apenas em InfinitePay e finanças.",
         "Não entendi. Poderia explicar melhor focando nos nossos serviços?",
-        "Isso foge do meu conhecimento. Tem alguma dúvida sobre sua conta?",
-        "Não consegui identificar sua solicitação no nosso contexto."
+        "Isso foge do meu conhecimento. Tem alguma dúvida sobre sua conta?"
     ]
     
+    # Remove a mensagem do usuário do histórico para não confundir o modelo depois
     delete_op = RemoveMessage(id=messages[-1].id)
     
+    # NÃO retorna AIMessage na chave "messages", logo o output é efêmero
     return {
         "final_response": random.choice(options),
         "messages": [delete_op]
     }
 
 # ------------------------------------------------------------------
-# NOS AUXILIARES
+# NOS AUXILIARES (SEM POLUIR MEMÓRIA)
 # ------------------------------------------------------------------
 def guardrail_node(state: AgentState):
     messages = state["messages"]
     delete_op = RemoveMessage(id=messages[-1].id)
+    
     return {
         "final_response": "Ação bloqueada por motivos de segurança.",
         "messages": [delete_op] 
     }
 
 def human_handoff_node(state: AgentState):
-    return {"final_response": "Entendido. Transferindo para um humano..."}
+    # Handoff geralmente é uma conclusão, podemos salvar ou não. Vamos salvar para registro.
+    return {
+        "final_response": "Entendido. Transferindo para um humano...",
+        "messages": [AIMessage(content="Transferindo para um humano...")]
+    }
 
 # ------------------------------------------------------------------
 # NO 5: PERSONALITY AGENT
@@ -235,21 +242,17 @@ def personality_node(state: AgentState):
     logger.info("Personality: Refinando...")
     
     system_prompt = (
-        "Você é o Editor de Texto da InfinitePay. Reescreva a mensagem abaixo.\n\n"
+        "Você é o Editor de Texto da InfinitePay. Reescreva a mensagem abaixo.\n"
         "REGRAS:\n"
         "1. Se houver 'Fonte: [link]' no original, MANTENHA no final.\n"
         "2. Se NÃO houver fonte, NÃO adicione nada.\n"
-        "3. NÃO crie links falsos.\n\n"
-        "TOM:\n"
-        "- Bloqueio/Segurança: Sério.\n"
-        "- Resto: Leve, útil, emojis moderados (⚡, 🚀).\n\n"
+        "TOM: Leve, útil, emojis moderados (⚡, 🚀).\n"
         f"MENSAGEM ORIGINAL:\n{original_response}"
     )
     
     response = llm.invoke(system_prompt)
     cleaned_response = response.content.strip().replace('"', '') 
     
-    # Limpeza de segurança
     if "[inserir" in cleaned_response or "link aqui" in cleaned_response:
         cleaned_response = cleaned_response.split("Fonte:")[0].strip()
     
@@ -281,12 +284,12 @@ workflow.add_conditional_edges("router", route_decision, {
     "END": END
 })
 
+# Todos convergem para personalidade antes do fim
 workflow.add_edge("knowledge_agent", "personality")
 workflow.add_edge("support_agent", "personality")
 workflow.add_edge("guardrail", "personality")
 workflow.add_edge("human_handoff", "personality")
 workflow.add_edge("fallback", "personality")
-
 workflow.add_edge("personality", END)
 
 app_swarm = workflow.compile(checkpointer=memory)
