@@ -1,26 +1,29 @@
 import logging
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from app.core.workflow import app_swarm
 from langchain_core.messages import HumanMessage
+from app.core.workflow import app_swarm
 
-# Configuracao de Logging da API
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Configuração de Logging
+logging.basicConfig(
+    level=logging.INFO, 
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger("API_Gateway")
 
 app = FastAPI(
     title="InfinitePay Agent Swarm API",
-    description="API de orquestracao multi-agente com persistencia de estado.",
+    description="Interface de orquestração para sistema multi-agente com persistência de contexto.",
     version="1.2.0"
 )
 
 class UserRequest(BaseModel):
-    """Modelo de dados para requisicao de chat."""
+    """Payload de entrada para requisições de chat."""
     message: str
     user_id: str
 
 class AgentResponse(BaseModel):
-    """Modelo de dados para resposta da API."""
+    """Estrutura padronizada de resposta da API."""
     response: str
     agent_used: str
     status: str = "success"
@@ -28,35 +31,33 @@ class AgentResponse(BaseModel):
 @app.post("/api/chat", response_model=AgentResponse)
 async def chat_endpoint(request: UserRequest):
     """
-    Endpoint principal de chat.
-    
-    Funcionalidades:
-    - Processa mensagens do usuario.
-    - Mantem contexto da conversa (memoria) baseado no user_id.
-    - Gerencia excecoes e erros de processamento.
+    Processa interações de chat através do orquestrador multi-agente (Swarm).
+
+    Utiliza o `user_id` para manter o estado da sessão no LangGraph e executa
+    o fluxo de decisão de forma assíncrona para garantir alta concorrência.
 
     Args:
-        request (UserRequest): Payload JSON contendo mensagem e user_id.
+        request (UserRequest): Objeto contendo a mensagem do usuário e ID da sessão.
 
     Returns:
-        AgentResponse: Resposta processada pelo enxame de agentes.
+        AgentResponse: Objeto contendo a resposta gerada, o agente responsável e o status.
+
+    Raises:
+        HTTPException: Retorna 500 em caso de falhas críticas no processamento do grafo.
     """
     logger.info(f"Requisicao recebida | User ID: {request.user_id}")
     
     try:
-        # Configuracao de persistencia: user_id atua como thread_id
         config = {"configurable": {"thread_id": request.user_id}}
         
-        # Estado de entrada (apenas o necessario, o resto vem da memoria)
         input_state = {
             "messages": [HumanMessage(content=request.message)],
             "user_id": request.user_id
         }
         
-        # Execucao do Grafo
-        result = app_swarm.invoke(input_state, config=config)
+        # Execução assíncrona (ainvoke) para não bloquear o Event Loop do FastAPI
+        result = await app_swarm.ainvoke(input_state, config=config)
         
-        # Identificacao do agente final (pode ser o proprio router em caso de fallback)
         agent_used = result.get("next_agent", "router_fallback")
         final_text = result.get("final_response", "Sem resposta gerada.")
         
@@ -71,10 +72,15 @@ async def chat_endpoint(request: UserRequest):
         logger.error(f"Erro critico no processamento: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500, 
-            detail="Ocorreu um erro interno ao processar sua solicitacao. Tente novamente."
+            detail="Ocorreu um erro interno ao processar sua solicitacao."
         )
 
 @app.get("/health")
 def health_check():
-    """Endpoint de verificacao de saude da aplicacao."""
+    """
+    Endpoint para verificação de disponibilidade do serviço (Liveness Probe).
+    
+    Returns:
+        dict: Status operacional do serviço.
+    """
     return {"status": "operational", "service": "agent-swarm"}
