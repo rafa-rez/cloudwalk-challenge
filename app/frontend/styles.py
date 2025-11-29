@@ -1,34 +1,37 @@
-# app/frontend/styles.py
+"""
+Módulo responsável por armazenar as definições de CSS da aplicação.
+Separa a estilização da lógica de componentes.
+"""
 
 GLOBAL_CSS = """
 <style>
     .stApp { background-color: #0e1117; }
     .main .block-container { padding-top: 2rem; padding-bottom: 5rem; }
     
-    /* Scrollbar */
+    /* Scrollbar Personalizada */
     ::-webkit-scrollbar { width: 10px; height: 10px; }
     ::-webkit-scrollbar-track { background: #1e1e24; }
     ::-webkit-scrollbar-thumb { background: #555; border-radius: 5px; }
     ::-webkit-scrollbar-thumb:hover { background: #7b61ff; }
 
-    /* Estilo para Abas */
+    /* Estilização das Abas de Navegação */
    .stTabs [role="tab"] {
-    height: 58px !important;
-    padding: 14px 32px !important; /* aumenta a largura */
-    white-space: pre-wrap;
-    background-color: #1e1e24;
-    border-radius: 8px;
-    color: white;
-    font-weight: 600;
-    font-size: 1.05rem;
-}
+        height: 58px !important;
+        padding: 14px 32px !important;
+        white-space: pre-wrap;
+        background-color: #1e1e24;
+        border-radius: 8px;
+        color: white;
+        font-weight: 600;
+        font-size: 1.05rem;
+    }
     .stTabs [aria-selected="true"] { background-color: #7b61ff; color: white; }
 </style>
 """
 
 LOG_TABLE_CSS = """
 <style>
-    /* Estilo da Tabela de Log */
+    /* Estilo da Tabela de Logs de Auditoria */
     .log-container {
         max-height: 400px; overflow-y: auto; border: 1px solid #444;
         border-radius: 8px; background-color: #1e1e24; margin-top: 10px;
@@ -49,7 +52,7 @@ LOG_TABLE_CSS = """
 
 TEST_METRICS_CSS = """
 <style>
-    /* Estilo das Métricas de Teste */
+    /* Estilo dos Cards de Métricas de QA */
     .metric-box {
         background-color: #262730; padding: 15px; border-radius: 8px;
         border-left: 5px solid #7b61ff; text-align: center; color: white;
@@ -61,6 +64,7 @@ TEST_METRICS_CSS = """
 
 CIRCUIT_BOARD_CSS = """
 <style>
+    /* Estilo do Visualizador de Grafo (Circuit Board) */
     .circuit-board {
         display: flex; flex-direction: column; align-items: center;
         width: 100%; font-family: 'Source Sans Pro', sans-serif; padding: 20px 0;

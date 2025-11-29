@@ -1,4 +1,3 @@
-# app/frontend/components/tab_architecture.py
 import streamlit as st
 import requests
 import uuid
@@ -7,9 +6,18 @@ from datetime import datetime
 from app.frontend.components.visualizer import render_modern_flow
 
 def render_tab_architecture(api_url: str):
+    """
+    Renderiza a aba de arquitetura "Stateless".
+    
+    Permite enviar requisições isoladas para visualizar o comportamento do roteador
+    sem influência de memória de contexto anterior.
+
+    Args:
+        api_url (str): URL base do endpoint da API.
+    """
     col1, col2 = st.columns([1, 1.5])
     
-    # --- COLUNA 1: INPUT E RESPOSTA ---
+    # --- Painel de Controle (Esquerda) ---
     with col1:
         st.subheader("Simulador de Arquitetura")
         st.info("Visualização técnica: Cada mensagem é processada isoladamente (Stateless).")
@@ -18,7 +26,7 @@ def render_tab_architecture(api_url: str):
         
         if st.button("Enviar", type="primary"):
             if prompt:
-                # UUID novo a cada request para simular stateless
+                # Gera UUID novo para garantir que o backend trate como nova sessão
                 temp_id = f"stateless_{str(uuid.uuid4())}"
                 start_ts = time.time()
                 
@@ -32,11 +40,11 @@ def render_tab_architecture(api_url: str):
                         agent_resp = data["response"]
                         agent_used = data["agent_used"]
                         
-                        # Atualiza Estado
+                        # Atualiza Estado da Sessão
                         st.session_state.last_agent = agent_used
                         st.session_state.last_response = agent_resp
                         
-                        # Salva no LOG
+                        # Registro de Auditoria
                         if "audit_log" not in st.session_state:
                             st.session_state.audit_log = []
                             
@@ -49,19 +57,19 @@ def render_tab_architecture(api_url: str):
                         })
                         
                     except Exception as e:
-                        st.error(f"Erro: {e}")
+                        st.error(f"Erro de comunicação com a API: {e}")
 
         if "last_response" in st.session_state:
             st.success(f"🤖 **Resposta:** {st.session_state.last_response}")
 
-    # --- COLUNA 2: VISUALIZADOR ---
+    # --- Visualizador de Fluxo (Direita) ---
     with col2:
         st.subheader("Fluxo de Decisão")
         st.markdown("---")
         active = st.session_state.get("last_agent", None)
         render_modern_flow(active)
 
-    # --- TABELA DE LOGS ---
+    # --- Tabela de Logs ---
     st.markdown("### 📜 Log da Sessão (Debug)")
     if "audit_log" in st.session_state and st.session_state.audit_log:
         rows_html = ""

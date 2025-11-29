@@ -1,9 +1,15 @@
-# app/frontend/components/visualizer.py
 import streamlit as st
 import textwrap
 from app.frontend.styles import CIRCUIT_BOARD_CSS
 
-def render_modern_flow(active_agent=None):
+def render_modern_flow(active_agent: str = None):
+    """
+    Renderiza o diagrama de fluxo de agentes (estilo Circuit Board).
+    Destaca visualmente o agente ativo no processamento atual.
+
+    Args:
+        active_agent (str, optional): Nome do agente ativo para aplicar classe CSS de destaque.
+    """
     
     def get_class(agent_name):
         base = "node-card"
@@ -11,8 +17,7 @@ def render_modern_flow(active_agent=None):
             return f"{base} active-node pulsing"
         return base
 
-    # Usamos textwrap.dedent para remover a indentação do Python
-    # que o Markdown confunde com blocos de código
+    # textwrap.dedent remove a indentação do Python para que o Markdown não interprete como bloco de código
     html_content = textwrap.dedent(f"""
     <div class="circuit-board">
         <div class="node-card central-node">
@@ -52,5 +57,4 @@ def render_modern_flow(active_agent=None):
     </div>
     """)
     
-    # Renderiza CSS + HTML com permissão explícita
     st.markdown(CIRCUIT_BOARD_CSS + html_content, unsafe_allow_html=True)

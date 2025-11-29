@@ -1,20 +1,25 @@
-# app/frontend/components/tab_chat.py
 import streamlit as st
 import requests
 import uuid
 
 def reset_conversation():
+    """Reinicia o ID da sessão e limpa o histórico de mensagens local."""
     st.session_state.chat_session_id = str(uuid.uuid4())
     st.session_state.context_messages = []
     st.toast("Memória limpa! Nova thread iniciada.", icon="🧹")
 
-def get_agent_badge(agent_name):
+def get_agent_badge(agent_name: str) -> str:
     """
-    Retorna HTML formatado com a cor correspondente ao agente.
+    Gera o HTML de uma 'badge' visual indicando qual agente processou a mensagem.
+
+    Args:
+        agent_name (str): Identificador do agente retornado pela API.
+
+    Returns:
+        str: String HTML contendo a estilização e ícone do agente.
     """
     if not agent_name: return ""
     
-    # Definição de Cores e Ícones
     styles = {
         "support_agent":   {"color": "#ffa500", "icon": "🛠️", "label": "Support Agent"},
         "knowledge_agent": {"color": "#00bfff", "icon": "📚", "label": "Knowledge Agent"},
@@ -24,10 +29,8 @@ def get_agent_badge(agent_name):
         "router":          {"color": "#bc8f8f", "icon": "🧠", "label": "Router Direct"},
     }
     
-    # Fallback para agentes desconhecidos
     style = styles.get(agent_name, {"color": "#888", "icon": "🤖", "label": agent_name})
     
-    # HTML da Etiqueta (Badge)
     return f"""
     <div style="
         display: inline-flex; align-items: center; gap: 5px;
@@ -42,9 +45,15 @@ def get_agent_badge(agent_name):
     """
 
 def render_tab_chat(api_url: str):
+    """
+    Renderiza a interface de chat contextual (Stateful).
+    Mantém o histórico visual e interage com a mesma sessão no backend.
+
+    Args:
+        api_url (str): URL base do endpoint da API.
+    """
     st.subheader("💬 Assistente Virtual (Com Memória)")
     
-    # Header com ID e Botão
     c1, c2 = st.columns([6, 1])
     with c1:
         st.caption(f"Sessão ID: `{st.session_state.chat_session_id}` (Memória Ativa)")
@@ -55,7 +64,7 @@ def render_tab_chat(api_url: str):
 
     chat_container = st.container(height=500)
     
-    # --- RENDERIZAÇÃO DO HISTÓRICO ---
+    # Renderização do Histórico
     with chat_container:
         if not st.session_state.context_messages:
             st.markdown("<div style='text-align: center; color: #666;'>Inicie a conversa...</div>", unsafe_allow_html=True)
@@ -64,19 +73,17 @@ def render_tab_chat(api_url: str):
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
                 
-                # Se for mensagem do assistente e tiver o dado do agente, mostra o log
+                # Exibe badge do agente se disponível
                 if msg["role"] == "assistant" and "agent" in msg:
                     st.markdown(get_agent_badge(msg["agent"]), unsafe_allow_html=True)
 
-    # --- INPUT DO USUÁRIO ---
+    # Input do Usuário
     if user_input := st.chat_input("Digite sua dúvida..."):
-        # 1. Adiciona input visualmente
         st.session_state.context_messages.append({"role": "user", "content": user_input})
         with chat_container:
             with st.chat_message("user"):
                 st.markdown(user_input)
 
-        # 2. Envia para API
         try:
             payload = {"message": user_input, "user_id": st.session_state.chat_session_id}
             
@@ -86,18 +93,16 @@ def render_tab_chat(api_url: str):
                 agent_resp = data["response"]
                 agent_used = data["agent_used"]
                 
-                # 3. Salva a resposta COM O METADADO DO AGENTE
+                # Armazena resposta e metadado do agente
                 st.session_state.context_messages.append({
                     "role": "assistant", 
                     "content": agent_resp,
-                    "agent": agent_used  # <--- Importante para o log aparecer depois
+                    "agent": agent_used 
                 })
                 
-                # 4. Renderiza a resposta imediatamente
                 with chat_container:
                     with st.chat_message("assistant"):
                         st.markdown(agent_resp)
-                        # Renderiza o badge logo após a resposta
                         st.markdown(get_agent_badge(agent_used), unsafe_allow_html=True)
 
         except Exception as e:

@@ -1,8 +1,8 @@
-# app/frontend/components/tab_tests.py
 import streamlit as st
 import requests
 import time
 
+# Cenários de Teste Pré-definidos
 SCENARIOS = [
     {"category": "KNOWLEDGE", "desc": "Taxas Maquininha", "payload": {"message": "Quais as taxas da Smart?", "user_id": "tester_rag"}, "expected_agent": "knowledge_agent"},
     {"category": "KNOWLEDGE", "desc": "Fatos Gerais (Web)", "payload": {"message": "Preço do Bitcoin hoje?", "user_id": "tester_rag"}, "expected_agent": "knowledge_agent"},
@@ -14,7 +14,17 @@ SCENARIOS = [
     {"category": "FALLBACK", "desc": "Nonsense", "payload": {"message": "asdfasdf 123", "user_id": "random_user"}, "expected_agent": "fallback"},
 ]
 
-def run_test_scenario(api_url, scenario):
+def run_test_scenario(api_url: str, scenario: dict) -> dict:
+    """
+    Executa um cenário de teste individual contra a API.
+
+    Args:
+        api_url (str): Endpoint da API.
+        scenario (dict): Dicionário contendo payload e expectativas.
+
+    Returns:
+        dict: Resultado contendo status, agente utilizado e tempo de execução.
+    """
     try:
         start = time.time()
         response = requests.post(api_url, json=scenario["payload"])
@@ -23,6 +33,8 @@ def run_test_scenario(api_url, scenario):
         if response.status_code == 200:
             data = response.json()
             actual_agent = data.get("agent_used", "N/A")
+            
+            # Validação flexível: Sucesso se for o agente esperado OU se for END mas vindo do Knowledge
             is_success = (scenario["expected_agent"] == actual_agent) or \
                          (scenario["expected_agent"] == "END" and actual_agent == "knowledge_agent")
 
@@ -36,6 +48,7 @@ def run_test_scenario(api_url, scenario):
         return {"status": "error", "error": str(e), "response_text": f"Erro Conexão: {str(e)}"}
 
 def render_tab_tests(api_url: str):
+    """Renderiza a aba de execução de testes de QA."""
     st.header("📊 Relatório de Testes (QA)")
 
     if st.button("▶️ Executar Bateria de Testes"):
