@@ -1,35 +1,34 @@
-# Imagem base
+# Imagem base Python
 FROM python:3.10-slim
 
 WORKDIR /app
 
-# Variaveis de ambiente para otimizacao do Python
+# Variáveis de ambiente para otimização
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Instalacao de dependencias do sistema (Adicionado graphviz aqui!)
+# Instalação de dependências do sistema
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     graphviz \
     && rm -rf /var/lib/apt/lists/*
 
-# 1. Instalacao otimizada do PyTorch (Versao CPU para reduzir tamanho da imagem)
-RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+# Instalação de bibliotecas Python pesadas (Cache Layer)
+RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir sentence-transformers
 
-# 2. Instalacao do Sentence Transformers (dependencia pesada)
-RUN pip install --no-cache-dir sentence-transformers
-
-# 3. Instalacao das demais dependencias do projeto
+# Instalação das dependências do projeto
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia do codigo fonte
+# Cópia do código fonte e scripts
 COPY . .
 
-# Expõe as portas (API e Streamlit)
+# Exposição de portas e permissões de execução
 EXPOSE 8000
 EXPOSE 8501
+RUN chmod +x start.sh
 
-# O comando padrão continua sendo a API, mas será sobrescrito no compose para o frontend
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Entrypoint
+CMD ["./start.sh"]

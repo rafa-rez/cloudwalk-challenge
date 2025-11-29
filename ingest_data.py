@@ -9,7 +9,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 from dotenv import load_dotenv
 
-# Configuracao de Logging Corporativo
+# Configuração de Logging
 logging.basicConfig(
     level=logging.INFO, 
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -19,13 +19,13 @@ logger = logging.getLogger("DataIngestion")
 
 load_dotenv()
 
-# --- Configuracoes e Constantes ---
+# Constantes de Configuração
 CHROMA_PATH = "./chroma_db"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 
-# Headers para simular um navegador real e evitar bloqueios (403 Forbidden)
+# Headers para simulação de User-Agent
 REQUEST_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
 }
@@ -50,16 +50,13 @@ TARGET_URLS = [
 
 def load_documents(urls: List[str]) -> List[Document]:
     """
-    Carrega documentos HTML das URLs fornecidas de forma resiliente.
+    Carrega documentos HTML a partir de uma lista de URLs com tratamento de exceções.
     
-    Tenta carregar cada URL individualmente para garantir que falhas em uma pagina
-    nao impecam o carregamento das demais.
-
-    Parameters:
-    - urls (List[str]): Lista de URLs para processamento.
+    Args:
+        urls (List[str]): Lista de URLs alvo para scraping.
 
     Returns:
-    - List[Document]: Lista de documentos LangChain carregados com sucesso.
+        List[Document]: Lista de documentos carregados e enriquecidos com metadados.
     """
     documents = []
     logger.info(f"Iniciando carregamento de {len(urls)} URLs...")
@@ -72,34 +69,30 @@ def load_documents(urls: List[str]) -> List[Document]:
             )
             docs = loader.load()
             
-            # Enriquece metadados se necessario e adiciona a lista principal
             for doc in docs:
-                # Garante que a fonte esteja clara nos metadados
                 if "source" not in doc.metadata:
                     doc.metadata["source"] = url
                 documents.append(doc)
                 
             logger.info(f"Sucesso ao carregar: {url}")
-            
-            # Breve pausa para nao sobrecarregar o servidor alvo (boas praticas de scraping)
             time.sleep(0.5) 
             
         except Exception as e:
             logger.error(f"Falha ao carregar URL {url}: {e}")
             continue
 
-    logger.info(f"Carregamento concluido. Total de documentos brutos: {len(documents)}")
+    logger.info(f"Carregamento concluído. Documentos brutos: {len(documents)}")
     return documents
 
 def split_text(documents: List[Document]) -> List[Document]:
     """
-    Divide os documentos em pedacos menores (chunks) para indexacao.
+    Divide documentos brutos em fragmentos (chunks) para otimização de embeddings.
 
-    Parameters:
-    - documents (List[Document]): Lista de documentos originais.
+    Args:
+        documents (List[Document]): Lista de documentos originais.
 
     Returns:
-    - List[Document]: Lista de chunks processados.
+        List[Document]: Lista de fragmentos processados.
     """
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
@@ -109,60 +102,50 @@ def split_text(documents: List[Document]) -> List[Document]:
     )
     
     chunks = text_splitter.split_documents(documents)
-    logger.info(f"Documentos divididos em {len(chunks)} chunks de texto.")
+    logger.info(f"Documentos divididos em {len(chunks)} chunks.")
     return chunks
 
 def save_to_chroma(chunks: List[Document]):
     """
-    Gera embeddings e persiste os chunks no banco vetorial ChromaDB.
+    Gera embeddings e persiste os dados no ChromaDB.
 
-    Parameters:
-    - chunks (List[Document]): Lista de fragmentos de texto.
+    Args:
+        chunks (List[Document]): Fragmentos de texto para indexação.
     """
-    # Verifica se existem chunks antes de prosseguir
     if not chunks:
-        logger.warning("Nenhum chunk disponivel para ingestao. Processo abortado.")
+        logger.warning("Nenhum dado para ingestão.")
         return
 
     logger.info(f"Inicializando modelo de embeddings: {EMBEDDING_MODEL}")
     embedding_function = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
 
-    # Opcional: Limpar banco anterior para evitar duplicatas em re-execucoes
-    # shutil.rmtree(CHROMA_PATH, ignore_errors=True) 
-
-    logger.info(f"Persistindo dados no diretorio: {CHROMA_PATH}")
+    logger.info(f"Persistindo dados em: {CHROMA_PATH}")
     try:
-        # Batch size padrao do Chroma e eficiente, mas o processo pode demorar dependendo da CPU
         Chroma.from_documents(
             documents=chunks,
             embedding=embedding_function,
             persist_directory=CHROMA_PATH
         )
-        logger.info("Ingestao concluida e banco vetorial salvo com sucesso.")
+        logger.info("Banco vetorial atualizado com sucesso.")
         
     except Exception as e:
-        logger.critical(f"Erro critico ao salvar no ChromaDB: {e}")
+        logger.critical(f"Erro ao salvar no ChromaDB: {e}")
         raise e
 
 def main():
-    """Funcao orquestradora do pipeline de ingestao."""
+    """Orquestrador do pipeline de ingestão de dados."""
     start_time = time.time()
     
     try:
-        # 1. Carregar
         raw_docs = load_documents(TARGET_URLS)
-        
-        # 2. Dividir
         chunks = split_text(raw_docs)
-        
-        # 3. Indexar e Salvar
         save_to_chroma(chunks)
         
         elapsed_time = time.time() - start_time
-        logger.info(f"Processo finalizado em {elapsed_time:.2f} segundos.")
+        logger.info(f"Pipeline finalizado em {elapsed_time:.2f} segundos.")
         
     except Exception as e:
-        logger.critical(f"Falha na execucao do script de ingestao: {e}")
+        logger.critical(f"Falha na execução do pipeline: {e}")
 
 if __name__ == "__main__":
     main()
