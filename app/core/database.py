@@ -1,7 +1,10 @@
-# app/core/database.py
+"""
+Módulo de simulação de banco de dados.
+Contém dados mockados para testes de cenários de suporte e validação de regras de negócio.
+"""
 
 MOCK_DB = {
-    # --- CENÁRIOS FELIZES (HAPPY PATH) ---
+    # Cenários de Sucesso (Happy Path)
     "client_happy": {
         "name": "João da Silva", 
         "balance": 1500.50, 
@@ -17,7 +20,7 @@ MOCK_DB = {
         "last_login": "2024-11-25"
     },
 
-    # --- CENÁRIOS DE ERRO FINANCEIRO ---
+    # Cenários de Erro Financeiro
     "client_debt": {
         "name": "Carlos Devedor", 
         "balance": -50.25, 
@@ -33,7 +36,7 @@ MOCK_DB = {
         "last_login": "2024-11-26"
     },
 
-    # --- CENÁRIOS DE BLOQUEIO/RISCO ---
+    # Cenários de Bloqueio e Risco
     "client_blocked": {
         "name": "Roberto Fraude", 
         "balance": 5000.00, 
@@ -49,7 +52,7 @@ MOCK_DB = {
         "last_login": "2022-05-20"
     },
     
-    # --- CENÁRIOS DE TESTE DE SISTEMA ---
+    # Cenários de Teste Interno
     "tester_rag": {
         "name": "QA Tester Knowledge",
         "balance": 100.00,
@@ -63,6 +66,6 @@ MOCK_DB = {
         "segment": "external"
     },
     
-    # Compatibilidade legado
+    # Legado
     "client789": {"name": "Legacy User", "balance": 1000.00, "status": "active"}
 }
