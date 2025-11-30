@@ -24,7 +24,7 @@ class TestExecutionReporter:
                 print(f"✅ {display_name:<50} ... PASSOU")
             elif report.failed:
                 print(f"❌ {display_name:<50} ... FALHOU")
-                # print(f"   └── Detalhes: {report.longrepr}") # Descomente para debug
+
 
 def run_suite():
     """
@@ -37,9 +37,9 @@ def run_suite():
     
     start_time = time.time()
     
-    # Executa pytest com flags de silêncio para limpar o output padrão
+    # Executa pytest com flags de silêncio 
     exit_code = pytest.main(
-        ["-q", "--tb=no", "tests/"], 
+        ["-q", "--tb=no", "-p", "no:warnings", "tests/"], 
         plugins=[TestExecutionReporter()]
     )
     

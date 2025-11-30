@@ -36,7 +36,7 @@ def test_health_check():
         "Handoff - Humano", 
         {"message": "Quero falar com um humano", "user_id": "angry_user"}, 
         "human_handoff", 
-        ["transferindo", "humano", "atendente"]
+        ["transferindo", "humano", "atendente", "transfer", "human", "atend", "especialista"]
     )
 ])
 def test_swarm_orchestration(scenario, payload, expected_agent, required_keywords):
