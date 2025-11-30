@@ -8,7 +8,7 @@ segurança através de Guardrails rígidos.
 
 ------------------------------------------------------------------------
 
-## 🧠 Arquitetura do Sistema
+## 🏗️ Arquitetura do Sistema
 
 O sistema utiliza **LangGraph** para gerenciar o fluxo de estado. A
 decisão de roteamento é **Stateless** (focada na intenção imediata),
