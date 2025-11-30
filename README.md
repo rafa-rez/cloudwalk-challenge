@@ -3,7 +3,7 @@
 **Uma arquitetura multi-agente robusta e modular para atendimento
 financeiro inteligente.**\
 Este projeto implementa um "Enxame de Agentes" (Agent Swarm) capaz de
-orquestrar atendimentos complexos, separar responsabilidades e garantir
+orquestrar atendimentos, separar responsabilidades e garantir
 segurança através de Guardrails rígidos.
 
 ------------------------------------------------------------------------
@@ -44,6 +44,7 @@ seja tratada corretamente.
     para buscas na web em tempo real.
 -   🛠️ **Support Agent:** Conecta-se a um banco de dados (Mock) para
     realizar consultas sensíveis (Saldo, Status da Conta, Bloqueios).
+-   🤷 **Fallback:** Camada desenvolvida visando economizar tokens, inputs gibberish caem aqui e são tratados de forma determinística
 -   🛡️ **Guardrail:** Camada de segurança determinística. Bloqueia
     tentativas de jailbreak, prompt injection ou linguagem tóxica.
 
@@ -65,23 +66,29 @@ Interface dividida em abas estratégicas:
 
 ## 📂 Estrutura do Projeto
 
-    app/
-    ├── agents/
-    │   ├── knowledge/
-    │   ├── router/
-    │   ├── support/
-    │   └── utils/
-    ├── core/
-    │   ├── config.py
-    │   ├── database.py
-    │   ├── state.py
-    │   ├── vector_store.py
-    │   └── workflow.py
-    ├── frontend/
-    │   ├── components/
-    │   ├── main.py
-    │   └── styles.py
-    └── main.py
+    agent-swarm/
+    ├── app/
+    │   ├── agents/
+    │   │   ├── knowledge/
+    │   │   ├── router/
+    │   │   ├── support/
+    │   │   └── utils/
+    │   ├── core/
+    │   │   ├── config.py
+    │   │   ├── database.py
+    │   │   ├── state.py
+    │   │   ├── vector_store.py
+    │   │   └── workflow.py
+    │   ├── frontend/
+    │   │   ├── components/
+    │   │   ├── main.py
+    │   │   └── styles.py
+    │   └── main.py
+    ├── Dockerfile
+    ├── docker-compose.yml
+    ├── start.sh
+    ├── ingest_data.py
+    └── run_tests.py
 
 ------------------------------------------------------------------------
 
@@ -96,7 +103,6 @@ Interface dividida em abas estratégicas:
 
     CHAVE_GROQ=gsk_sua_chave_aqui...
     GROQ_MODEL=llama-3.1-8b-instant
-    API_URL=http://backend:8000/api/chat
 
 ### 2. Executar com Docker
 
@@ -108,7 +114,15 @@ API Docs → http://localhost:8000/docs
 
 ### 3. Executar Testes
 
-Na aba **🧪 Bateria de Testes** no Streamlit.
+Você pode rodar os testes de duas formas:
+
+**🧪 Pela interface (Streamlit):**  
+Acesse a aba **Bateria de Testes** no frontend.
+
+**🖥️ Pelo terminal:**  
+```bash
+docker-compose exec backend python run_tests.py
+```
 
 ------------------------------------------------------------------------
 
@@ -119,18 +133,18 @@ Na aba **🧪 Bateria de Testes** no Streamlit.
 -   Scraping via `ingest_data.py`
 -   Embeddings com `all-MiniLM-L6-v2`
 -   ChromaDB busca top-4 chunks
--   Citação obrigatória de `metadata['source']`
+-   Citação obrigatória de `metadata['source']`, para agente de Knowledge e Support
 
 ### 🛡️ Guardrails
 
 -   *Keyword Blocking*
 -   *Sanitização de Saída*
--   *Isolamento de Memória*
+-   *Isolamento de Memória* ( Não enviando mensagens trigger para o contexto )
 
 ------------------------------------------------------------------------
+## 🔧 Built With
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.109-009688?style=for-the-badge&logo=fastapi)
-![LangGraph](https://img.shields.io/badge/LangGraph-Orchestration-FF6F00?style=for-the-badge)
-![Streamlit](https://img.shields.io/badge/Streamlit-Frontend-FF4B4B?style=for-the-badge&logo=streamlit)
-![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?style=for-the-badge&logo=docker)
+- **Python 3.10+** + **FastAPI** – Backend  
+- **LangGraph** – Orquestração de Agentes  
+- **Streamlit** – Frontend Interativo  
+- **Docker** – Containêrização
